@@ -25,8 +25,8 @@ class CombatStateStage(IntEnum):
 	INACTIVE = 2 # interruptible: windup, follow, idle, etc
 	ACTIVE = 3 # hit on attack, counter, stagger on hurt.
 
-class CombatState(IntEnum):
-	NONE = 0
+class CombatStateEnum(IntEnum):
+	IDLE = 0
 	ATTACK = 1
 	COUNTER = 2
 	HURT = 3
@@ -39,37 +39,36 @@ class CombatStageData:
 
 class BaseCSUpdateFunc:
 	def __init__(self):
-		self.t = 0.0
-		self.percentthrustage = 0.0
-
-	def update(self, dt, state):
 		pass
 
-class CSUpdateFunc_Done(BaseCSUpdateFunc):
-	def update(self, dt, state):
-		return CombatStateStage.DONE
-csupdatefunc_done = CSUpdateFunc_Done()
+	def update(self, state):
+		pass
 
 class CSUpdateFunc_Idle(BaseCSUpdateFunc):
-	def update(self, dt, state):	
-		self.percentthrustage = t / (MS_PER_FRAME_BATTLE * state.frames2next)
-		self.t += dt
+	def update(self, state):	
+		state.percentthrustage = state.t / (MS_PER_FRAME_BATTLE * state.frames2next)
+		state.t += PHYSICS_TIME_STEP * 1000
 		return CombatStateStage.INACTIVE
 csupdatefunc_idle = CSUpdateFunc_Idle()
 
 class CSUpdateFunc_Act(BaseCSUpdateFunc):
-	def update(self, dt, state):
-		self.percentthrustage = t / (MS_PER_FRAME_BATTLE * state.frames2next)
-		self.t += dt
-		currframes = self.t / MS_PER_FRAME_BATTLE
+	def update(self, state):
+		if (state.stage == CombatStateStage.DONE):
+			return CombatStateStage.DONE
+		state.percentthrustage = state.t / (MS_PER_FRAME_BATTLE * state.frames2next)
+		state.t += PHYSICS_TIME_STEP * 1000
+		currframes = state.t / MS_PER_FRAME_BATTLE
 		if (currframes >= state.frames2next):
-			self.t -= state.frames2next * MS_PER_FRAME_BATTLE
+			state.t -= state.frames2next * MS_PER_FRAME_BATTLE
 			state.nextstage()
 		return state.stage
 csupdatefunc_act = CSUpdateFunc_Act()
 
 class BaseCombatState:
-	def __init__(self, updatefunc, stagedata):
+	def __init__(self, statetype, updatefunc, stagedata):
+		self.statetype = statetype
+		self.t = 0.0
+		self.percentthrustage = 0.0
 		self.updatefunc = updatefunc
 		if (stagedata != None):
 			self.stagedataindex = 0
@@ -77,23 +76,31 @@ class BaseCombatState:
 			self.stage = stagedata.stages[0]
 			self.frames2next = stagedata.frames[0]
 
-	def update(self, dt):
-		return self.updatefunc(dt, self)
+	def reset(self):
+		self.t = 0.0
+		self.percentthrustage = 0.0
+		if (self.stagedata != None):
+			self.stagedataindex = 0
+			self.stage = self.stagedata.stages[0]
+			self.frames2next = self.stagedata.frames[0]
+		return self
+
+	def update(self):
+		return self.updatefunc.update(self)
+
+	def animationpercent(self):
+		return self.updatefunc.percentthrustage();
 			
 	def nextstage(self):
 		# this is where it matters if stagedata is SoA or AoS
 		# ...not very often, so I actually don't think it matters at all
 		self.stagedataindex += 1
 		if (self.stagedataindex >= self.stagedata.length):
-			self.update = self.update_done
 			self.stage = CombatStateStage.DONE
-		self.stage = self.stagedata.stages[self.stagedataindex]
-		self.frames2next = self.stagedata.frames[self.stagedataindex]
+		else:
+			self.stage = self.stagedata.stages[self.stagedataindex]
+			self.frames2next = self.stagedata.frames[self.stagedataindex]
 
-combatstate_idle = BaseCombatState(
-	csupdatefunc_idle,
-	CombatStageData(length=1, stages=[CombatStateStage.INACTIVE], frames=[4])
-)
 
 class GuardStateStage(IntEnum):
 	NONE = 0 # can re-guard from this stage
@@ -107,18 +114,48 @@ class GuardState:
 	def __init__(self):
 		self.stage = GuardStateStage.NONE
 
-class BaseBattleUnit:
-	class Stance(IntEnum):
-		UP = 0
-		DOWN = 1
+class BattleStance(IntEnum):
+	UP = 0
+	DOWN = 1
 
+class BattleUnit_Player():
 	def __init__(self):
-		self.stance = Stance.DOWN
+		self.load_states()		
 
-class BattleUnit_Player(BaseBattleUnit):
-	def __init__(self):
-		self.state_guard = GuardState()
-		self.state_combat = None
+		self.gstate_current = GuardState()
+		self.cstate_current = self.cstate_idle
+		self.stance = BattleStance.DOWN
+
+	def update(self):
+		cstage = self.cstate_current.update()
+		if (cstage == CombatStateStage.DONE):
+			print('return to idle')
+			self.cstate_current = self.cstate_idle.reset()
+
+	def load_states(self):
+		self.cstate_idle = BaseCombatState(
+			CombatStateEnum.IDLE,
+			csupdatefunc_idle,
+			CombatStageData(
+				length=1, 
+				stages=[CombatStateStage.INACTIVE], 
+				frames=[20]
+			)
+		)
+
+		self.cstate_latk = BaseCombatState(
+			CombatStateEnum.ATTACK,
+			csupdatefunc_act,
+			CombatStageData(
+				length=3, 
+				stages=[
+					CombatStateStage.INACTIVE,
+					CombatStateStage.ACTIVE,
+					CombatStateStage.INACTIVE
+				], 
+				frames=[10, 8, 10]
+			)
+		)
 
 '''
 class Players_Menu():
@@ -132,10 +169,13 @@ class Players_World():
 
 class Players_Battle():
 	def __init__(self):
-		self.Battle_unit = None
+		self.battleunit = BattleUnit_Player()
 
 	def reset(self):
 		pass
+
+	def update(self):
+		self.battleunit.update()
 
 class BaseInputHandler:
 	def __init__(self):
@@ -143,7 +183,6 @@ class BaseInputHandler:
 	def handle_input(player, inputdata):
 		pass
 
-'''
 class InputHandler_Menu(BaseInputHandler):
 	def handle_input(self, playersmenu, inputdata):
 		movedir = inputdata.get_var(InputDataIndex.STICK)
@@ -158,7 +197,6 @@ class InputHandler_World(BaseInputHandler):
 
 		activate = inputdata.get_var(InputDataIndex.A)
 		cancel = inputdata.get_var(InputDataIndex.B)
-'''
 
 class InputHandler_Battle(BaseInputHandler):
 	def handle_input(self, playersbattle, inputdata):
@@ -180,7 +218,22 @@ class InputHandler_Battle(BaseInputHandler):
 		heavy_atk = inputdata.get_var(InputDataIndex.LT)
 
 		# handle state changes on player(s)
-
+		curr_state = playersbattle.battleunit.cstate_current.statetype
+		# in idle state
+		if (curr_state == CombatStateEnum.IDLE):
+			# order of priority of action
+			if (light_atk):
+				print('light attack')
+				playersbattle.battleunit.cstate_current = \
+					playersbattle.battleunit.cstate_latk.reset()
+			elif (heavy_atk):
+				pass
+			elif (counter):
+				pass
+			elif (switch):
+				pass
+		elif (curr_state == CombatStateEnum.ATTACK):
+			pass
 
 class InputMoveDir(IntEnum):
 	NONE = 0
@@ -377,6 +430,10 @@ def main(*args):
 	# fps display smoother
 	current_fps = 0
 
+	# player and game stuff?
+	player = Players_Battle()
+	i = 0
+
 	while not done:
 		frametime = clock.tick() # time passed in millisecondss
 		accum += frametime/1000.0
@@ -439,8 +496,9 @@ def main(*args):
 
 			inputdata.newinput(curr_input)
 
-			player = 1 # TODO: temp code
 			curr_inputhandler.handle_input(player, inputdata)
+
+			player.update()
 
 			'''
 			# update player state/forces by reading inputdata structure
