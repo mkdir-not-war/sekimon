@@ -3,6 +3,14 @@ from enum import IntEnum
 import pygame
 from pygame.locals import *
 
+# time
+PHYSICS_TIME_STEP = 1.0/100
+
+# colors
+COLOR_RED = pygame.Color('red')
+COLOR_BLK = pygame.Color('black')
+COLOR_GRY = pygame.Color(200, 200, 200)
+
 class GameState(IntEnum):
 	play = 0
 	pause = 1
@@ -40,13 +48,13 @@ class BaseInputHandler:
 		pass
 
 class InputHandler_Menu(BaseInputHandler):
-	def handle_input(player, inputdata):
+	def handle_input(self, player, inputdata):
 		movedir = inputdata.get_var(InputDataIndex.STICK)
 		confirm = inputdata.get_var(InputDataIndex.A)
 		back = inputdata.get_var(InputDataIndex.B)
 
 class InputHandler_World(BaseInputHandler):
-	def handle_input(player, inputdata):
+	def handle_input(self, player, inputdata):
 		movedir_prev = inputdata.get_var(InputDataIndex.STICK, 1)
 		movedir = inputdata.get_var(InputDataIndex.STICK)
 		# do something to handle diagonal inputs
@@ -55,13 +63,15 @@ class InputHandler_World(BaseInputHandler):
 		cancel = inputdata.get_var(InputDataIndex.B)
 
 class InputHandler_Battle(BaseInputHandler):
-	def handle_input(player, inputdata):
+	def handle_input(self, player, inputdata):
 		movedir_prev = inputdata.get_var(InputDataIndex.STICK, 1)
 		movedir = inputdata.get_var(InputDataIndex.STICK)
 		# directions must be performed from neutral to do anything
-		if (movedir >= 6 and movedir <= 8 and movedir_prev == InputMoveDir.NONE):
+		if (movedir >= 6 and movedir <= 8 and 
+			(movedir_prev == InputMoveDir.NONE or movedir_prev == None)):
 			movedir = InputMoveDir.DOWN
-		elif (movedir >= 2 and movedir <= 4 and movedir_prev == InputMoveDir.NONE):
+		elif (movedir >= 2 and movedir <= 4 and 
+			(movedir_prev == InputMoveDir.NONE or movedir_prev == None)):
 			movedir = InputMoveDir.UP
 		else:
 			movedir = InputMoveDir.NONE
@@ -70,6 +80,8 @@ class InputHandler_Battle(BaseInputHandler):
 		switch = inputdata.get_var(InputDataIndex.B)
 		light_atk = inputdata.get_var(InputDataIndex.RT)
 		heavy_atk = inputdata.get_var(InputDataIndex.LT)
+
+		# handle state changes on player(s)
 
 
 class InputMoveDir(IntEnum):
@@ -205,8 +217,9 @@ class InputDataBuffer:
 		self.vars[var_idi][self.queuelength-1] = val
 		return val
 
-	def get_var(self, var_idi, queuei=1):
-		assert(queuei < self.queuelength-1)
+	def get_var(self, var_idi, queuei=0):
+		if (self.queuelength-1-queuei < 0):
+			return None
 		result = self.vars[var_idi][self.queuelength-1-queuei]
 		return result
 
@@ -221,7 +234,8 @@ def main(*args):
 	pygame.display.set_caption("sekimon")
 
 	# load fonts
-	font = pygame.font.Font('./data/fonts/ARI.ttf', 32)
+	fontdir = '../data/fonts/ARI.ttf' #'./data/fonts/ARI.ttf'
+	font = pygame.font.Font(fontdir, 32)
 
 	done = False
 	clock = pygame.time.Clock()
@@ -230,6 +244,9 @@ def main(*args):
 	prev_input = []
 	curr_input = [] # int list
 	inputdata = InputDataBuffer()
+
+	inputhandlers = [InputHandler_Menu(), InputHandler_World(), InputHandler_Battle()]
+	curr_inputhandler = inputhandlers[2]
 
 	num_joysticks = pygame.joystick.get_count()
 	joystick = None
@@ -253,21 +270,23 @@ def main(*args):
 		)
 	)
 	'''
+	screen = window # temporary while no camera code
 
 	# timing stuff
 	t = 0.0
 	accum = 0.0
+
+	# fps display smoother
+	current_fps = 0
 
 	while not done:
 		frametime = clock.tick() # time passed in millisecondss
 		accum += frametime/1000.0
 
 		# display FPS
-		fps_text = font.render(str(int(clock.get_fps())), 0, red)
-
-		if (DEBUG):
-			global highlight
-			highlight.clear()
+		current_fps = int(clock.get_fps()*0.6 + current_fps*0.4)
+		#current_fps = int(clock.get_fps())
+		fps_text = font.render(str(current_fps), 0, COLOR_RED)
 
 		# poll input and update physics 100 times a second
 		while (accum >= PHYSICS_TIME_STEP):
@@ -321,6 +340,7 @@ def main(*args):
 				break
 
 			inputdata.newinput(curr_input)
+			curr_inputhandler.handle_input(1, inputdata)
 
 			'''
 			# update player state/forces by reading inputdata structure
@@ -338,7 +358,7 @@ def main(*args):
 		#megabrain.update()
 
 		# start drawing
-		screen.fill(grey)
+		screen.fill(COLOR_GRY)
 
 		# get camera maptile range
 		'''
@@ -387,15 +407,10 @@ def main(*args):
 		'''
 
 		# draw player
+		'''
 		playerblit = player.draw(spritebatch, camera)
 		screen.blit(*playerblit)
-		
-
-		# highlight tiles for debug
-		DEBUG = False
-		if (DEBUG):
-			pass
-			# something using global highlight list
+		'''
 
 		screen.blit(fps_text, (1, 1))
 		
