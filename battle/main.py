@@ -24,12 +24,14 @@ class CombatStateStage(IntEnum):
 	DONE = 1 # signal to switch state to idle
 	INACTIVE = 2 # interruptible: windup, follow, idle, etc
 	ACTIVE = 3 # hit on attack, counter, stagger on hurt.
+	# TODO: is there a reason to differentiate between inactive/windup/follow/ etc?
 
 class CombatStateEnum(IntEnum):
 	IDLE = 0
 	ATTACK = 1
 	COUNTER = 2
 	HURT = 3
+	SWITCHING = 4
 
 class CombatStageData:
 	def __init__(self, length=0, stages=[], frames=[]):
@@ -114,17 +116,13 @@ class GuardState:
 	def __init__(self):
 		self.stage = GuardStateStage.NONE
 
-class BattleStance(IntEnum):
-	UP = 0
-	DOWN = 1
-
 class BattleUnit_Player():
 	def __init__(self):
 		self.load_states()		
 
 		self.gstate_current = GuardState()
 		self.cstate_current = self.cstate_idle
-		self.stance = BattleStance.DOWN
+		self.stance = InputMoveDir.DOWN
 
 	def update(self):
 		cstage = self.cstate_current.update()
@@ -143,6 +141,26 @@ class BattleUnit_Player():
 			)
 		)
 
+		self.cstate_stancedown = BaseCombatState(
+			CombatStateEnum.IDLE,
+			csupdatefunc_act,
+			CombatStageData(
+				length=1, 
+				stages=[CombatStateStage.INACTIVE], 
+				frames=[4]
+			)
+		)
+
+		self.cstate_stanceup = BaseCombatState(
+			CombatStateEnum.IDLE,
+			csupdatefunc_act,
+			CombatStageData(
+				length=1, 
+				stages=[CombatStateStage.INACTIVE], 
+				frames=[4]
+			)
+		)
+
 		self.cstate_latk = BaseCombatState(
 			CombatStateEnum.ATTACK,
 			csupdatefunc_act,
@@ -154,6 +172,20 @@ class BattleUnit_Player():
 					CombatStateStage.INACTIVE
 				], 
 				frames=[10, 8, 10]
+			)
+		)
+
+		self.cstate_hatk = BaseCombatState(
+			CombatStateEnum.ATTACK,
+			csupdatefunc_act,
+			CombatStageData(
+				length=3, 
+				stages=[
+					CombatStateStage.INACTIVE,
+					CombatStateStage.ACTIVE,
+					CombatStateStage.INACTIVE
+				], 
+				frames=[28, 8, 15] # ?? TODO: test this AFTER light attacks feel good
 			)
 		)
 
@@ -186,8 +218,14 @@ class BaseInputHandler:
 class InputHandler_Menu(BaseInputHandler):
 	def handle_input(self, playersmenu, inputdata):
 		movedir = inputdata.get_var(InputDataIndex.STICK)
-		confirm = inputdata.get_var(InputDataIndex.A)
-		back = inputdata.get_var(InputDataIndex.B)
+		activate = (
+			inputdata.get_var(InputDataIndex.A) and 
+			not inputdata.get_var(InputDataIndex.A, 1)
+		)
+		cancel = (
+			inputdata.get_var(InputDataIndex.B) and 
+			not inputdata.get_var(InputDataIndex.B, 1)
+		)
 
 class InputHandler_World(BaseInputHandler):
 	def handle_input(self, playersworld, inputdata):
@@ -195,8 +233,14 @@ class InputHandler_World(BaseInputHandler):
 		movedir = inputdata.get_var(InputDataIndex.STICK)
 		# do something to handle diagonal inputs
 
-		activate = inputdata.get_var(InputDataIndex.A)
-		cancel = inputdata.get_var(InputDataIndex.B)
+		activate = (
+			inputdata.get_var(InputDataIndex.A) and 
+			not inputdata.get_var(InputDataIndex.A, 1)
+		)
+		cancel = (
+			inputdata.get_var(InputDataIndex.B) and 
+			not inputdata.get_var(InputDataIndex.B, 1)
+		)
 
 class InputHandler_Battle(BaseInputHandler):
 	def handle_input(self, playersbattle, inputdata):
@@ -204,21 +248,41 @@ class InputHandler_Battle(BaseInputHandler):
 		movedir = inputdata.get_var(InputDataIndex.STICK)
 		# directions must be performed from neutral to do anything
 		if (movedir >= 6 and movedir <= 8 and 
-			(movedir_prev == InputMoveDir.NONE or movedir_prev == None)):
+			(movedir_prev == InputMoveDir.NONE or movedir_prev == 0)):
 			movedir = InputMoveDir.DOWN
 		elif (movedir >= 2 and movedir <= 4 and 
-			(movedir_prev == InputMoveDir.NONE or movedir_prev == None)):
+			(movedir_prev == InputMoveDir.NONE or movedir_prev == 0)):
 			movedir = InputMoveDir.UP
 		else:
 			movedir = InputMoveDir.NONE
 
-		counter = inputdata.get_var(InputDataIndex.A)
-		switch = inputdata.get_var(InputDataIndex.B)
-		light_atk = inputdata.get_var(InputDataIndex.RT)
-		heavy_atk = inputdata.get_var(InputDataIndex.LT)
+		# only count fresh inputs for these actions
+		counter = (
+			inputdata.get_var(InputDataIndex.A) and 
+			not inputdata.get_var(InputDataIndex.A, 1)
+		)
+		switch = (
+			inputdata.get_var(InputDataIndex.B) and 
+			not inputdata.get_var(InputDataIndex.B, 1)
+		)
+		light_atk = (
+			inputdata.get_var(InputDataIndex.RT) and 
+			not inputdata.get_var(InputDataIndex.RT, 1)
+		)
+		heavy_atk = (
+			inputdata.get_var(InputDataIndex.LT) and 
+			not inputdata.get_var(InputDataIndex.LT, 1)
+		)
+		pause = (
+			inputdata.get_var(InputDataIndex.START) and
+			not inputdata.get_var(InputDataIndex.START, 1)
+		)
 
 		# handle state changes on player(s)
 		curr_state = playersbattle.battleunit.cstate_current.statetype
+
+		if (pause):
+			return
 		# in idle state
 		if (curr_state == CombatStateEnum.IDLE):
 			# order of priority of action
@@ -227,13 +291,39 @@ class InputHandler_Battle(BaseInputHandler):
 				playersbattle.battleunit.cstate_current = \
 					playersbattle.battleunit.cstate_latk.reset()
 			elif (heavy_atk):
-				pass
+				print('heavy attack')
+				playersbattle.battleunit.cstate_current = \
+					playersbattle.battleunit.cstate_hatk.reset()
 			elif (counter):
-				pass
+				print('dodge/riposte')
 			elif (switch):
-				pass
+				print('switch characters')
+				# IDEA/ TODO: maybe the enemy pauses during a switch?
+			elif (movedir != InputMoveDir.NONE):
+				if (movedir == InputMoveDir.UP and
+					playersbattle.battleunit.stance != InputMoveDir.UP):
+
+					playersbattle.battleunit.cstate_current = \
+						playersbattle.battleunit.cstate_stanceup.reset()
+					playersbattle.battleunit.stance = InputMoveDir.UP
+					# TODO: refresh guard state here
+
+				elif (movedir == InputMoveDir.DOWN and
+					playersbattle.battleunit.stance != InputMoveDir.DOWN):
+				
+					playersbattle.battleunit.cstate_current = \
+						playersbattle.battleunit.cstate_stancedown.reset()
+					playersbattle.battleunit.stance = InputMoveDir.DOWN
+					# TODO: and refresh guard state here too
+
+		'''
+		elif (curr_state == CombatStateEnum.HURT):
+			pass
 		elif (curr_state == CombatStateEnum.ATTACK):
 			pass
+		elif (curr_state == CombatStateEnum.COUNTER):
+			pass
+		'''
 
 class InputMoveDir(IntEnum):
 	NONE = 0
@@ -303,17 +393,23 @@ class InputDataBuffer:
 					moveinputvecy += -1
 
 			# joystick directions
+			'''
 			if (event.type == pygame.JOYAXISMOTION):
 				pass
 			if (event.type == pygame.JOYHATMOTION):
 				if event.hat == 0:
-					# haven't checked whether y-value is good on this
+					# TODO: haven't checked whether y-value is good on this
 					moveinputvecx, moveinputvecy = event.value
+			'''
 
 			if (event.type == pygame.KEYDOWN):
-				# jumping
+				# counter
 				if event.key == pygame.K_SPACE:
 					self.set_var(InputDataIndex.A, True)
+
+				# switch
+				if event.key == pygame.K_s:
+					self.set_var(InputDataIndex.B, True)
 
 				# attacking
 				if event.key == pygame.K_f:
@@ -322,6 +418,7 @@ class InputDataBuffer:
 					self.set_var(InputDataIndex.LT, True)
 
 			# more joystick actions
+			'''
 			if (event.type == pygame.JOYBUTTONDOWN):
 				# jumping
 				if event.button == 0:
@@ -332,6 +429,7 @@ class InputDataBuffer:
 					self.set_var(InputDataIndex.RT, True)
 				if event.button == 2:
 					self.set_var(InputDataIndex.LT, True)
+			'''
 
 		# discrete thumbstick/keyboard directions
 		if moveinputvecx > 0:
@@ -455,10 +553,11 @@ def main(*args):
 			for event in events:
 				if event.type == pygame.QUIT:
 					done = True
-				elif (event.type == pygame.JOYBUTTONDOWN or
-					event.type == pygame.KEYDOWN):
+				elif (event.type == pygame.KEYDOWN or
+					event.type == pygame.JOYBUTTONDOWN):
 					curr_input.append(event)
 
+				'''
 				# if new axis/hat, then remove previous (if any) from curr_input
 				elif (event.type == pygame.JOYAXISMOTION or
 					event.type == pygame.JOYHATMOTION):
@@ -467,30 +566,35 @@ def main(*args):
 							curr_input.remove(cev)
 					if (event.value != (0, 0)):
 						curr_input.append(event)
+				'''
 
 			# remove values from curr_input on release of input
 			for r_event in events:
-				if (r_event.type == pygame.JOYBUTTONUP):
-					for event in curr_input:
-						if (event.type == pygame.JOYBUTTONDOWN and
-							event.button == r_event.button):
-							curr_input.remove(event)
-							break
-				elif (r_event.type == pygame.KEYUP):
+				if (r_event.type == pygame.KEYUP):
 					for event in curr_input:
 						if (event.type == pygame.KEYDOWN and 
 							event.key == r_event.key):
 							curr_input.remove(event)
 							break
+				'''
+				elif (r_event.type == pygame.JOYBUTTONUP):
+					for event in curr_input:
+						if (event.type == pygame.JOYBUTTONDOWN and
+							event.button == r_event.button):
+							curr_input.remove(event)
+							break
+				'''
 
 			# skip update and quit if directed
 			for event in curr_input:
 				if (event.type == pygame.KEYDOWN and
 					event.key == pygame.K_ESCAPE):
 					done = True
+				'''
 				elif (event.type == pygame.JOYBUTTONDOWN and
 					event.button == 6):
 					done = True
+				'''
 			if (done):
 				break
 
