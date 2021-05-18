@@ -30,19 +30,20 @@ class ContentManager:
 		return result
 
 	def load(self, contentid):
-		# TODO: override this in child classes
-		return ([], 0)
+		return None
 
 class TextureManager(ContentManager):
 	def load(self, textureid):
 		# load the full image file (pygame, sdl2, etc)
 		filepath = '../%s' % TEX_DATA[textureid]['filepath']
 		new_texture = image_load(filepath)
+		new_texture = new_texture.convert()
 
 		return new_texture
 
 	''' get -> pygame.Surface '''
-	def get(self, textureid, framepos_x=0, framepos_y=0):
+	# TODO: more sophisticated 'get' using the animation type (using time on animations, e.g.)?
+	def get(self, textureid, framenum_x=0, framenum_y=0):
 		textureindex = self.get_contentindex(textureid)
 		assert(textureindex != -1) 
 
@@ -50,17 +51,17 @@ class TextureManager(ContentManager):
 		frame_dim = (texturedata['frame-width'], texturedata['frame-height'])
 		buffer_dim = texturedata['buffer-width'], texturedata['buffer-height']
 		frame_offset = (
-			framepos_x * (frame_dim[0] + buffer_dim[0]), 
-			framepos_y * (frame_dim[1] + buffer_dim[1])
+			framenum_x * (frame_dim[0] + buffer_dim[0]), 
+			framenum_y * (frame_dim[1] + buffer_dim[1])
 		)
 		texture_rect = Rect(frame_offset, frame_dim)
 
-		result = self.loaded[textureindex].subsurface(texture_rect)
+		image = self.loaded[textureindex]
+		result = image.subsurface(texture_rect)
 
 		return result
 
 class AnimationManager(ContentManager):
 	def load(self, animationid):
-		new_animations = []
-		length = 0
-		return (new_animations, length)
+		new_animation
+		return new_animation

@@ -2,6 +2,7 @@ from sys import argv
 from enum import IntEnum
 import pygame
 from pygame.locals import *
+from content import TextureManager
 
 # time
 PHYSICS_TIME_STEP = 1.0/100
@@ -521,6 +522,9 @@ def main(*args):
 	'''
 	screen = window # temporary while no camera code
 
+	# drawing stuff
+	texman = TextureManager()
+
 	# timing stuff
 	t = 0.0
 	accum = 0.0
@@ -528,11 +532,15 @@ def main(*args):
 	# fps display smoother
 	current_fps = 0
 
+	# drawing shantae
+	frame = 0
+
 	# player and game stuff?
 	player = Players_Battle()
 	i = 0
 
 	while not done:
+		#frametime = clock.tick(60)
 		frametime = clock.tick() # time passed in millisecondss
 		accum += frametime/1000.0
 
@@ -673,6 +681,25 @@ def main(*args):
 		playerblit = player.draw(spritebatch, camera)
 		screen.blit(*playerblit)
 		'''
+
+		##### shantae texture test ############
+		num = 48
+		blitlist = []
+		for i in range(num):
+			framenum_x = ((frame+i)//4)%10
+			image = texman.get('shantae-idle-down', framenum_x=framenum_x)
+			pos = (10+(i%6)*160, 10+(i//6)*90)
+			rect = pygame.Rect(pos, (49*3, 28*3))
+			scale = (rect.w, rect.h)
+			image = pygame.transform.scale(image, scale)
+			result = (image, rect)
+			blitlist.append(result)
+		screen.blits(blitlist)
+
+		frame += 1
+		if (frame >= 40):
+			frame = 0
+		######################################
 
 		screen.blit(fps_text, (1, 1))
 		
