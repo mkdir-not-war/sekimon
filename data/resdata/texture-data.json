@@ -1,0 +1,25 @@
+{
+	"_prototype" : {
+		"filepath" : "res/test.jpg",
+		"type" : "static/bones/animation",
+		"width" : 8,
+		"height" : 8,
+		"frame-width" : 63,
+		"frame-height" : 63,
+		"buffer-width" : 1,
+		"buffer-height" : 1
+	},
+
+	"textures" : {
+		"shantae-idle-down" : {
+			"filepath" : "res/shantae/shantae-idle-down.png",
+			"type" : "animation",
+			"width" : 10,
+			"height" : 1,
+			"frame-width" : 49,
+			"frame-height" : 28,
+			"buffer-width" : 1,
+			"buffer-height" : 1
+		}
+	}
+}
