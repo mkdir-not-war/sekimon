@@ -532,9 +532,6 @@ def main(*args):
 	# fps display smoother
 	current_fps = 0
 
-	# drawing shantae
-	frame = 0
-
 	# player and game stuff?
 	player = Players_Battle()
 	i = 0
@@ -545,7 +542,7 @@ def main(*args):
 		accum += frametime/1000.0
 
 		# display FPS
-		current_fps = int(clock.get_fps()*0.6 + current_fps*0.4)
+		current_fps = int(clock.get_fps()*0.9 + current_fps*0.1)
 		#current_fps = int(clock.get_fps())
 		fps_text = font.render(str(current_fps), 0, COLOR_RED)
 
@@ -683,22 +680,17 @@ def main(*args):
 		'''
 
 		##### shantae texture test ############
-		num = 48
-		blitlist = []
+		num = 10
+		blitlist.clear()
 		for i in range(num):
-			framenum_x = ((frame+i)//4)%10
-			image = texman.get('shantae-idle-down', framenum_x=framenum_x)
-			pos = (10+(i%6)*160, 10+(i//6)*90)
-			rect = pygame.Rect(pos, (49*3, 28*3))
+			image = texman.fa_timed_sample('shantae-idle-up', t*1000, repeat=True)
+			pos = (10+(i%8)*120, 10+(i//8)*140)
+			rect = pygame.Rect(pos, (49*3, 43*3))
 			scale = (rect.w, rect.h)
 			image = pygame.transform.scale(image, scale)
 			result = (image, rect)
 			blitlist.append(result)
 		screen.blits(blitlist)
-
-		frame += 1
-		if (frame >= 40):
-			frame = 0
 		######################################
 
 		screen.blit(fps_text, (1, 1))

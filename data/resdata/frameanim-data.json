@@ -1,0 +1,26 @@
+{
+	"_prototype" : {
+		"textureid" : "shantae-idle",
+		"framenum_y" : 0,
+		"start_x" : 0,
+		"length" : 14,
+		"time_ms" : 1000
+	},
+
+	"data" : {
+		"shantae-idle-up" : {
+			"textureid" : "shantae-idle",
+			"framenum_y" : 0,
+			"start_x" : 0,
+			"length" : 14,
+			"time_ms" : 1000
+		},
+		"shantae-idle-down" : {
+			"textureid" : "shantae-idle",
+			"framenum_y" : 1,
+			"start_x" : 0,
+			"length" : 10,
+			"time_ms" : 1000
+		}
+	}
+}

@@ -1,23 +1,17 @@
 {
 	"_prototype" : {
 		"filepath" : "res/test.jpg",
-		"type" : "static/bones/animation?? Is this necessary?",
-		"width" : 8,
-		"height" : 8,
 		"frame-width" : 63,
 		"frame-height" : 63,
 		"buffer-width" : 1,
 		"buffer-height" : 1
 	},
 
-	"textures" : {
-		"shantae-idle-down" : {
-			"filepath" : "res/shantae/shantae-idle-down.png",
-			"type" : "animation",
-			"width" : 10,
-			"height" : 1,
+	"data" : {
+		"shantae-idle" : {
+			"filepath" : "res/shantae/shantae-idle.png",
 			"frame-width" : 48,
-			"frame-height" : 27,
+			"frame-height" : 43,
 			"buffer-width" : 2,
 			"buffer-height" : 2
 		}
