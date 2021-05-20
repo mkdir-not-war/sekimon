@@ -89,6 +89,8 @@ class TextureManager(ContentManager):
 		For now, the sampling function can just live in TextureManager.
 
 	'''
+
+	'''
 	def fa_sample(self, animationid, t_percent):
 		animationdata = _FA_DATA[animationid]
 
@@ -101,6 +103,7 @@ class TextureManager(ContentManager):
 
 		result = self.get(textureid, framenum_x=framenum_x, framenum_y=framenum_y)
 		return result
+	'''
 
 	def fa_timed_sample(self, animationid, ms_since_start, repeat=False):
 		animationdata = _FA_DATA[animationid]

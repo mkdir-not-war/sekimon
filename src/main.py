@@ -357,6 +357,13 @@ class InputDataBuffer:
 		for inputtype in InputDataIndex:
 			self.vars.append([])
 
+		self.button_mapping = {
+			pygame.K_SPACE : InputDataIndex.A, # counter
+			pygame.K_s : InputDataIndex.B, # switch
+			pygame.K_f : InputDataIndex.RT, # light attack
+			pygame.K_d : InputDataIndex.LT # heavy attack
+		}
+
 	''' 
 	~ joystick event info ~
 	JOYAXISMOTION     joy, axis, value
@@ -404,19 +411,8 @@ class InputDataBuffer:
 			'''
 
 			if (event.type == pygame.KEYDOWN):
-				# counter
-				if event.key == pygame.K_SPACE:
-					self.set_var(InputDataIndex.A, True)
-
-				# switch
-				if event.key == pygame.K_s:
-					self.set_var(InputDataIndex.B, True)
-
-				# attacking
-				if event.key == pygame.K_f:
-					self.set_var(InputDataIndex.RT, True)
-				if event.key == pygame.K_d:
-					self.set_var(InputDataIndex.LT, True)
+				if event.key in self.button_mapping:
+					self.set_var(self.button_mapping[event.key], True)
 
 			# more joystick actions
 			'''
@@ -472,6 +468,24 @@ class InputDataBuffer:
 			return None
 		result = self.vars[var_idi][self.queuelength-1-queuei]
 		return result
+
+'''
+def draw(self, spriteindex, rect, fliphorz=False):
+	image = self.sprites[spriteindex].get_image()
+	# scale image to the rect (already zoomed)
+	scale = rect.get_dim()
+	image = pygame.transform.scale(image, scale)
+
+	result = None
+
+	if (fliphorz):
+		image = pygame.transform.flip(image, True, False)
+		result = (image, rect.get_pyrect())
+	else:
+		result = (image, rect.get_pyrect())
+
+	return result
+'''
 
 def main(*args):
 	pygame.init()
@@ -680,7 +694,7 @@ def main(*args):
 		'''
 
 		##### shantae texture test ############
-		num = 10
+		num = 40
 		blitlist.clear()
 		for i in range(num):
 			image = texman.fa_timed_sample('shantae-idle-up', t*1000, repeat=True)
