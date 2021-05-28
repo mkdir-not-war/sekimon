@@ -1,0 +1,103 @@
+{
+	"NOTE: " : "This may be temporary -- might use a more custom data format?",
+	"_prototype" : {
+		"num-frames" : 4,
+		"num-bones" : 2,
+		"bones" : {
+			"head" : [
+				{
+					"visible" : true,
+					"position-x" : 0,
+					"position-y" : 0,
+					"rotation-deg" : 0
+				},
+				{
+					"visible" : true,
+					"position-x" : 0,
+					"position-y" : 50,
+					"rotation-deg" : 10
+				},
+				null,
+				{
+					"visible" : true,
+					"position-x" : 0,
+					"position-y" : 0,
+					"rotation-deg" : 0
+				}
+			],
+			"torso" : [
+				{
+					"visible" : true,
+					"position-x" : 0,
+					"position-y" : 0,
+					"rotation-deg" : 0
+				},
+				{
+					"visible" : true,
+					"position-x" : 0,
+					"position-y" : 20,
+					"rotation-deg" : 5
+				},
+				null,
+				{
+					"visible" : true,
+					"position-x" : 0,
+					"position-y" : 0,
+					"rotation-deg" : 0
+				}
+			]
+		}
+	},
+	"data" : {
+		"test" : {
+			"num-frames" : 5,
+			"num-bones" : 2,
+			"bones" : {
+				"head" : [
+					{
+						"visible" : true,
+						"position-x" : 0,
+						"position-y" : 0,
+						"rotation-deg" : 0
+					},
+					null,
+					{
+						"visible" : true,
+						"position-x" : 0,
+						"position-y" : 50,
+						"rotation-deg" : 10
+					},
+					null,
+					{
+						"visible" : true,
+						"position-x" : 0,
+						"position-y" : 0,
+						"rotation-deg" : 0
+					}
+				],
+				"torso" : [
+					{
+						"visible" : true,
+						"position-x" : 0,
+						"position-y" : 0,
+						"rotation-deg" : 0
+					},
+					null,
+					{
+						"visible" : true,
+						"position-x" : 0,
+						"position-y" : 20,
+						"rotation-deg" : 5
+					},
+					null,
+					{
+						"visible" : true,
+						"position-x" : 0,
+						"position-y" : 0,
+						"rotation-deg" : 0
+					}
+				]
+			}
+		}
+	}
+}

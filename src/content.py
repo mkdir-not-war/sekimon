@@ -12,6 +12,10 @@ frameanimdatafile = open('../data/resdata/frameanim-data.json',)
 _FA_DATA = json.load(frameanimdatafile)['data']
 frameanimdatafile.close()
 
+boneanimdatafile = open('../data/resdata/boneanim-data.json',)
+_BA_DATA = json.load(boneanimdatafile)['data']
+boneanimdatafile.close()
+
 ''' # NOTE: 
 
 	Since self.loaded will be an array of different struct types for 
@@ -90,21 +94,6 @@ class TextureManager(ContentManager):
 
 	'''
 
-	'''
-	def fa_sample(self, animationid, t_percent):
-		animationdata = _FA_DATA[animationid]
-
-		textureid = animationdata['textureid']
-		framenum_y = animationdata['framenum_y']
-		start_x = animationdata['start_x']
-		length = animationdata['length']
-
-		framenum_x = int(length * t_percent) + start_x
-
-		result = self.get(textureid, framenum_x=framenum_x, framenum_y=framenum_y)
-		return result
-	'''
-
 	def fa_timed_sample(self, animationid, ms_since_start, repeat=False):
 		animationdata = _FA_DATA[animationid]
 
@@ -128,14 +117,168 @@ class TextureManager(ContentManager):
 		result = self.get(textureid, framenum_x=framenum_x, framenum_y=framenum_y)
 		return result
 
+	'''
+	def fa_sample(self, animationid, t_percent):
+		animationdata = _FA_DATA[animationid]
+
+		textureid = animationdata['textureid']
+		framenum_y = animationdata['framenum_y']
+		start_x = animationdata['start_x']
+		length = animationdata['length']
+
+		framenum_x = int(length * t_percent) + start_x
+
+		result = self.get(textureid, framenum_x=framenum_x, framenum_y=framenum_y)
+		return result
+	'''
+
+class BoneFrame:
+	def __init__(self, visible, x, y, rot):
+		self.visible = visible
+		self.x = x
+		self.y = y
+		self.pos = (x, y)
+		self.rot = rot
+
+	def print(self):
+		print('vis:%s, (%d, %d), @%d deg' % (self.visible, self.x, self.y, self.rot))
+
+class BoneAnimation:
+	def __init__(self, name, numframes, numbones):
+		self.name = name
+		self.numframes = numframes
+		self.numbones = numbones
+		self.bones = {}
+
+	def set_boneframe(self, bonename, frame, visible, x, y, rot):
+		newbf = BoneFrame(visible, x, y, rot)
+		self.bones[bonename][frame] = newbf
+
+	def get_final_boneframe(self, bone):
+		result = self.bones[bone][self.numframes-1]
+		return result
+
+	def lerp_boneframe(self, bone, indexA, indexB, t):
+		frameA = self.bones[bone][indexA]
+		while (frameA == None):
+			indexA -= 1
+			frameA = self.bones[bone][indexA]
+
+		frameB = self.bones[bone][indexB]
+		while (frameB == None):
+			indexB += 1
+			frameB = self.bones[bone][indexA]
+
+		rotdiff1 = frameB.rot - frameA.rot
+		rotdiff2 = (frameB.rot-360) - frameA.rot
+		rotdiff3 = frameB.rot - (frameA.rot-360)
+
+		rotdiff = rotdiff1
+		if (abs(rotdiff2) < abs(rotdiff)):
+			rotdiff = rotdiff2
+		if (abs(rotdiff3) < abs(rotdiff)):
+			rotdiff = rotdiff3
+
+		result = BoneFrame(
+			frameA.visible,
+			frameA.x + t * (frameB.x - frameA.x),
+			frameA.y + t * (frameB.y - frameA.y),
+			frameA.rot + t * rotdiff
+		)
+
+		return result
 
 class BoneAnimationManager(ContentManager):
 	def load(self, animationid):
-		new_animation
+		animdata = _BA_DATA[animationid]
+
+		bones = animdata['bones']
+		numframes = animdata['num-frames']
+
+		new_animation = BoneAnimation(
+			animationid, 
+			animdata['num-frames'], 
+			animdata['num-bones']
+		)
+
+		for bone in bones:
+			new_animation.bones[bone] = [None] * new_animation.numframes
+
+			for frame in range(len(bones[bone])):
+				framedata = bones[bone][frame]
+				if (framedata != None):
+					new_animation.set_boneframe(
+						bone, 
+						frame,
+						framedata['visible'],
+						framedata['position-x'],
+						framedata['position-y'],
+						framedata['rotation-deg']
+					)
+
+		'''
+		For the sake of speed (and since the ContentManager is already space efficient),
+		we're going to store all the frames, not just the key frames in the JSON.
+		To get the frames in between the key frames, we'll do the lerping up front here.
+		'''
+
+		lerpbounds = []
+		for bone in bones:
+			startindex = 0
+			nextindex = 0
+			for frame in bones[bone]:
+				if (frame == None):
+					if (startindex == nextindex):
+						startindex -= 1
+				else:
+					# this frame has data
+					if (nextindex > startindex):
+						lerpbounds.append((startindex, nextindex))
+						# reset start index
+						startindex = nextindex
+					startindex += 1
+				nextindex += 1
+			break
+
+		for bounds in lerpbounds:
+			start = bounds[0]
+			finish = bounds[1]
+			diff = finish - start
+			current = 1
+
+			assert(current != diff)
+			while (current != diff):
+				for bone in bones:
+					lerpedframe = new_animation.lerp_boneframe(
+						bone, start, finish, current/diff
+					)
+					new_animation.bones[bone][start+current] = lerpedframe
+				current += 1
+
 		return new_animation
 
 	def ba_sample(self, animationid, t_percent):
-		pass
+		animindex = self.get_contentindex(animationid)
+		assert(animindex != -1)
+
+		animation = self.loaded[animindex]
+
+		# sample the frames using lerp, return a dict of BoneFrames
+		result = {}
+
+		if (t_percent >= 1.0):
+			for bone in animation.bones:
+				ff = animation.get_final_boneframe(bone)
+				result[bone] = ff
+		else:
+			index = int((animation.numframes-1) * t_percent)
+			t = (animation.numframes-1) * t_percent - index
+			for bone in animation.bones:
+				result[bone] = animation.lerp_boneframe(bone, index, index+1, t)
+
+		return result
+			
+
 
 def test_setup():
 	from pygame import init

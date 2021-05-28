@@ -1,0 +1,18 @@
+{
+	"_prototype" : {
+		"bone-textures" : [
+			{
+				"name" : "head",
+				"texid" : "bones_pig-brown",
+				"texindex" : 0
+			},
+			{
+				"name" : "torso",
+				"texid" : "bones_pig-brown",
+				"texindex" : 1
+			}
+		]
+	},
+	"data" : {
+	}
+}
