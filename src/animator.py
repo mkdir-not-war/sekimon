@@ -97,6 +97,7 @@ def prompt_help():
 
 	# TODO: add all commands in this list ###################
 	helpinfo.append(('H', 'help: print this list again'))
+	helpinfo.append(('S', 'state: print current editor state info'))
 	helpinfo.append(('L', 'load: enter animationid to load new animation'))
 	helpinfo.append(('SPACE', 'mode switch: swap between edit and play'))
 	#########################################################
@@ -107,22 +108,31 @@ def prompt_help():
 		if (plen > maxplen):
 			maxplen = plen
 
-	print('~'*10 + ' Commands ' + '~'*10)
+	header = '~'*10 + ' Commands ' + '~'*10
+	print(header)
 	for lineindex in range(len(helpinfo)):
 		if ((lineindex+2)%3==0):
 			print()
 		prompt, info = helpinfo[lineindex]
 		numspaces = maxplen - len(prompt) + 3
 		print(' %s'%prompt + ' '*numspaces + '\t' + '%s'%info)
+	print('~'*len(header))
 	print()
 
-def prompt_load():
+def prompt_stateinfo(curr_stateinfo):
+	curr_stateinfo.print()
+
+def prompt_load(stateinfo):
 	done_with_prompt = False
 	while (not done_with_prompt):
 		userinput = input('>> ')
 
-def prompt_switchmode(kargs):
-	kargs['editmode'] = not kargs['editmode']
+def prompt_switchmode(stateinfo):
+	if (stateinfo.editmode):
+		print('Leaving edit mode, playing animation.')
+	else:
+		print('Returning to edit mode.')
+	stateinfo.editmode = not stateinfo.editmode
 
 def prompt_save():
 	# save values here
@@ -144,24 +154,22 @@ class InputHandler:
 	def __init__(self):
 		pass
 
-	def handle_input(self, inputdata, **kargs):
-		# shallow copy kargs
-		result = {}
-		for key in kargs:
-			result[key] = kargs[key]
+	def handle_input(self, inputdata, stateinfo):
+		result = stateinfo.copy()
 
 		movedir_prev = inputdata.get_var(InputDataIndex.MOVEDIR, 1)
 		movedir = inputdata.get_var(InputDataIndex.MOVEDIR)
 
 		# context sensitive move code
-		if (kargs['editmode'] == True):
+		if (stateinfo.editmode == True):
 			pass
 
 		# only count fresh inputs for these actions
 		fresh_actions = [
 			InputDataIndex.HELP,
 			InputDataIndex.LOAD,
-			InputDataIndex.PLAY_EDIT_SWITCH
+			InputDataIndex.PLAY_EDIT_SWITCH,
+			InputDataIndex.STATEINFO
 		]
 
 		fresh_action_procs = {}
@@ -175,12 +183,14 @@ class InputHandler:
 		# map actions to functions here
 		if (fresh_action_procs[InputDataIndex.HELP]):
 			prompt_help()
-		elif (kargs['editmode'] == True): 
+		elif (fresh_action_procs[InputDataIndex.STATEINFO]):
+			prompt_stateinfo(stateinfo)
+		elif (stateinfo.editmode == True): 
 			# edit mode
 			if (fresh_action_procs[InputDataIndex.PLAY_EDIT_SWITCH]):
 				prompt_switchmode(result)
 			elif (fresh_action_procs[InputDataIndex.LOAD]):
-				prompt_load()
+				prompt_load(result)
 		else: 
 			# play mode
 			if (fresh_action_procs[InputDataIndex.PLAY_EDIT_SWITCH]):
@@ -206,6 +216,7 @@ class InputDataIndex(IntEnum):
 	LOAD = 1
 	PLAY_EDIT_SWITCH = 2
 	MOVEDIR = 3
+	STATEINFO = 4
 
 MAXINPUTQUEUELEN = 5
 
@@ -222,7 +233,8 @@ class InputDataBuffer:
 		self.button_mapping = {
 			pygame.K_h : InputDataIndex.HELP,
 			pygame.K_l : InputDataIndex.LOAD,
-			pygame.K_SPACE : InputDataIndex.PLAY_EDIT_SWITCH
+			pygame.K_SPACE : InputDataIndex.PLAY_EDIT_SWITCH,
+			pygame.K_s : InputDataIndex.STATEINFO
 		}
 
 	def newinput(self, curr_input):
@@ -355,6 +367,34 @@ class SpriteBatch:
 
 		return result
 
+class EditorState:
+	def __init__(self):
+		self.editmode = True
+		self.curr_animationid = ''
+		self.curr_frame = -1
+		self.curr_bone = ''
+
+	def set(self, newinfo):
+		self.editmode = newinfo.editmode
+		self.curr_animationid = newinfo.curr_animationid
+		self.curr_frame = newinfo.curr_frame
+		self.curr_bone = newinfo.curr_bone
+
+	def print(self):
+		header = '~'*6 + ' STATEINFO: ' + '~'*12
+		print(header)
+
+		print(' editmode:\t%s' % self.editmode)
+		print(' anim id:\t%s' % self.curr_animationid)
+		print(' frame:\t\t%d' % self.curr_frame)
+		print(' bone:\t\t%s' % self.curr_bone)
+		print('~'*len(header))
+
+	def copy(self):
+		newinfo = EditorState()
+		newinfo.set(self)
+		return newinfo
+
 def main():
 	pygame.init()
 
@@ -366,7 +406,7 @@ def main():
 	prompt_help()
 
 	# state info
-	editmode = True
+	stateinfo = EditorState()
 	done = False
 
 	# load data
@@ -438,14 +478,8 @@ def main():
 
 			inputdata.newinput(curr_input)
 
-			inputresult = inputhandler.handle_input(
-				inputdata, 
-				editmode=editmode
-			)
-
-			# handle input result for global states
-			editmode = inputresult['editmode']
-
+			inputresult = inputhandler.handle_input(inputdata, stateinfo)
+			stateinfo.set(inputresult)
 
 		# start drawing
 		screen.fill(COLOR_GRY)
