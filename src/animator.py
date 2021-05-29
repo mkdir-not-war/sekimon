@@ -1,5 +1,22 @@
+'''
+
+# TODO:
+
+	* change commands from 1-hotkey-per-command
+	to 1-hotkey to open the command dialogue,
+	then type in the command. Like Skyrim.
+
+	* add commands for changing the time (ms)
+	and for changing/loading an entity (texture data)
+
+	* actually display the animation both in
+	edit mode and play mode
+
+'''
+
 # namespaces
 import pygame
+import content
 
 # utilities
 from sys import argv, getsizeof
@@ -7,15 +24,13 @@ from enum import IntEnum
 
 # classes and constants
 from pygame.locals import *
-from content import TextureManager, BoneAnimationManager
 
 # time
 PHYSICS_TIME_STEP = 1.0/100
-MS_PER_FRAME_BATTLE = 33 # 30 fps
 
 # constants
-TILE_WIDTH = 20
 MAXINPUTQUEUELEN = 10
+ALLBONEANIMIDS = content.get_allboneanimids()
 
 # colors
 COLOR_LGRY = pygame.Color(125, 125, 125)
@@ -126,6 +141,17 @@ def prompt_load(stateinfo):
 	done_with_prompt = False
 	while (not done_with_prompt):
 		userinput = input('>> ')
+		if (userinput == 'quit'):
+			break
+		elif (userinput in ALLBONEANIMIDS):
+			print('Loading "%s".' % userinput)
+			stateinfo.curr_animationid = userinput
+			stateinfo.curr_frame = 0
+			stateinfo.curr_bone = content.get_bonesinanim(userinput)[0]
+			break
+		else:
+			print('"%s" not recognized from list of animation ids.')
+			print('Enter "quit" to exit loading.')
 
 def prompt_switchmode(stateinfo):
 	if (stateinfo.editmode):
@@ -373,12 +399,22 @@ class EditorState:
 		self.curr_animationid = ''
 		self.curr_frame = -1
 		self.curr_bone = ''
+		self.curr_entityid = ''
+		self.animtime_ms = 1000
 
 	def set(self, newinfo):
+		result = None
+		if (newinfo.curr_animationid != self.curr_animationid):
+			result = content.get_animationdata(newinfo.curr_animationid)
+
 		self.editmode = newinfo.editmode
 		self.curr_animationid = newinfo.curr_animationid
 		self.curr_frame = newinfo.curr_frame
 		self.curr_bone = newinfo.curr_bone
+		self.curr_entityid = newinfo.curr_entityid
+		self.animtime_ms = newinfo.animtime_ms
+
+		return result
 
 	def print(self):
 		header = '~'*6 + ' STATEINFO: ' + '~'*12
@@ -388,12 +424,21 @@ class EditorState:
 		print(' anim id:\t%s' % self.curr_animationid)
 		print(' frame:\t\t%d' % self.curr_frame)
 		print(' bone:\t\t%s' % self.curr_bone)
+		print(' entity:\t\t%s' % self.curr_entityid)
+		print(' time:\t\t%d ms' % self.animtime_ms)
 		print('~'*len(header))
 
 	def copy(self):
 		newinfo = EditorState()
 		newinfo.set(self)
 		return newinfo
+
+def print_startmessage():
+	print()
+	print("Starting in editor mode.")
+	print("Press H for a list of commands.")
+	print("Press L to load an animation.")
+	print()
 
 def main():
 	pygame.init()
@@ -403,14 +448,14 @@ def main():
 	screen = pygame.display.set_mode(screendim)
 	pygame.display.set_caption("animator")
 
-	prompt_help()
+	print_startmessage()
 
 	# state info
 	stateinfo = EditorState()
 	done = False
 
 	# load data
-	bam = BoneAnimationManager()
+	bam = content.BoneAnimationManager(editor=True)
 
 	# input stuff
 	prev_input = []
@@ -423,7 +468,7 @@ def main():
 	font = pygame.font.Font('../data/fonts/ARI.ttf', 32)
 
 	# editor stuff
-	current_animation = None
+	current_adata = None # this will be a deep copy dict into _WORKING_BA_DATA
 
 	# timing stuff
 	clock = pygame.time.Clock()
@@ -479,7 +524,9 @@ def main():
 			inputdata.newinput(curr_input)
 
 			inputresult = inputhandler.handle_input(inputdata, stateinfo)
-			stateinfo.set(inputresult)
+			newanimationdata = stateinfo.set(inputresult)
+			if (newanimationdata != None):
+				current_adata = newanimationdata
 
 		# start drawing
 		screen.fill(COLOR_GRY)
@@ -487,11 +534,14 @@ def main():
 		# draw sprites
 		blitlist = []
 
-		# draw frame
-		#blitimg = SpriteBatch.draw_boneframe()
-		#blitlist.append(blitimg)
-		screen.blits(blitlist)
-		blitlist.clear()
+		if (stateinfo.editmode):
+			# draw frame
+			#blitimg = SpriteBatch.draw_boneframe()
+			#blitlist.append(blitimg)
+			screen.blits(blitlist)
+			blitlist.clear()
+		else:
+			# play animation
 
 		# display fps
 		screen.blit(fps_text, (1, 1))

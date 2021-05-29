@@ -28,6 +28,28 @@ boneanimdatafile.close()
 
 '''
 
+###### These methods are only used in the animation editor ##############
+
+_WORKING_BA_DATA = _BA_DATA.copy()
+
+def get_allboneanimids():
+	result = list(_WORKING_BA_DATA.keys())
+	return result
+
+def get_bonesinanim(animid):
+	result = list(_WORKING_BA_DATA[animid]['bones'].keys())
+	return result
+
+def get_animationdata(animid):
+	# get a complete copy of the data, changes made to this will be reflected in dict
+	result = _WORKING_BA_DATA[animid]
+
+def reset_animationdata(animid):
+	_WORKING_BA_DATA[animid] = _BA_DATA[animid].copy()
+	print("Reset working animation data to current data from json.")
+
+#########################################################################
+
 class ContentManager:
 	def __init__(self):
 		self.content_name_dict = {}
@@ -189,8 +211,15 @@ class BoneAnimation:
 		return result
 
 class BoneAnimationManager(ContentManager):
+	def __init__(self, editor=False):
+		self.data = None
+		if (editor):
+			self.data = _WORKING_BA_DATA
+		else:
+			self.data = _BA_DATA
+
 	def load(self, animationid):
-		animdata = _BA_DATA[animationid]
+		animdata = self.data[animationid]
 
 		bones = animdata['bones']
 		numframes = animdata['num-frames']
