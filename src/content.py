@@ -30,6 +30,10 @@ boneanimdatafile.close()
 
 ###### These methods are only used in the animation editor ##############
 
+editordatafile = open('../data/resdata/animationeditor-data.json',)
+_EDIT_DATA = json.load(editordatafile)
+editordatafile.close()
+
 _WORKING_BA_DATA = _BA_DATA.copy()
 
 def get_allboneanimids():

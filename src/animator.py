@@ -2,12 +2,11 @@
 
 # TODO:
 
-	* change commands from 1-hotkey-per-command
-	to 1-hotkey to open the command dialogue,
-	then type in the command. Like Skyrim.
-
-	* add commands for changing the time (ms)
-	and for changing/loading an entity (texture data)
+	* commands to add:
+		- Time of animation
+		- change/load entity (texture data)
+		- repeat on/off
+		- like id=<partial animation id>, list similarly named ids
 
 	* actually display the animation both in
 	edit mode and play mode
@@ -104,63 +103,51 @@ class Rect:
 		)
 		return result
 
-### Functionality Code ##########################################
+#### TODO: ALL COMMANDS HERE ##########################################################
+COMMANDS_DICT = {}
 
-def prompt_help():
-	helpinfo = []
-	helpinfo.append(('[ key ]', '[ info ]'))
+def command_help(kargs):
+	commands = []
+	commands.append(('[ command ]', '[ info ]'))
 
-	# TODO: add all commands in this list ###################
-	helpinfo.append(('H', 'help: print this list again'))
-	helpinfo.append(('S', 'state: print current editor state info'))
-	helpinfo.append(('L', 'load: enter animationid to load new animation'))
-	helpinfo.append(('SPACE', 'mode switch: swap between edit and play'))
-	#########################################################
+	for entry in content._EDIT_DATA['commands']:
+		commands.append((entry['prompt'], entry['info']))
 
 	maxplen = 1
-	for line in helpinfo:
+	for line in commands:
 		plen = len(line[0])
 		if (plen > maxplen):
 			maxplen = plen
 
 	header = '~'*10 + ' Commands ' + '~'*10
 	print(header)
-	for lineindex in range(len(helpinfo)):
+	for lineindex in range(len(commands)):
 		if ((lineindex+2)%3==0):
 			print()
-		prompt, info = helpinfo[lineindex]
+		prompt, info = commands[lineindex]
 		numspaces = maxplen - len(prompt) + 3
 		print(' %s'%prompt + ' '*numspaces + '\t' + '%s'%info)
 	print('~'*len(header))
 	print()
+COMMANDS_DICT['help'] = command_help
 
-def prompt_stateinfo(curr_stateinfo):
-	curr_stateinfo.print()
+def command_stateinfo(kargs):
+	kargs['stateinfo'].print()
+COMMANDS_DICT['state'] = command_stateinfo
 
-def prompt_load(stateinfo):
-	done_with_prompt = False
-	while (not done_with_prompt):
-		userinput = input('>> ')
-		if (userinput == 'quit'):
-			break
-		elif (userinput in ALLBONEANIMIDS):
-			print('Loading "%s".' % userinput)
-			stateinfo.curr_animationid = userinput
-			stateinfo.curr_frame = 0
-			stateinfo.curr_bone = content.get_bonesinanim(userinput)[0]
-			break
-		else:
-			print('"%s" not recognized from list of animation ids.')
-			print('Enter "quit" to exit loading.')
-
-def prompt_switchmode(stateinfo):
-	if (stateinfo.editmode):
-		print('Leaving edit mode, playing animation.')
+def command_load(kargs):
+	animid = kargs['animid']
+	stateinfo = kargs['stateinfo']
+	if (animid in ALLBONEANIMIDS):
+		print('Loading "%s".' % animid)
+		stateinfo.curr_animationid = animid
+		stateinfo.curr_frame = 0
+		stateinfo.curr_bone = content.get_bonesinanim(animid)[0]
 	else:
-		print('Returning to edit mode.')
-	stateinfo.editmode = not stateinfo.editmode
+		print('"%s" not recognized from list of animation ids.')
+COMMANDS_DICT['load'] = command_load
 
-def prompt_save():
+def command_save():
 	# save values here
 	'''
 	data[animation.name] = adata
@@ -171,10 +158,63 @@ def prompt_save():
 	print('New animation saved.')
 	'''
 
-def prompt_addframe():
+def command_addframe():
 	pass
 
-####################################################################
+### TODO: ALL HOTKEYS HERE #######################################################
+
+def hotkey_help():
+	hotkeys = []
+	hotkeys.append(('[ key ]', '[ info ]'))
+
+	for entry in content._EDIT_DATA['hotkeys']:
+		hotkeys.append((entry['key'], entry['info']))
+
+	maxplen = 1
+	for line in hotkeys:
+		plen = len(line[0])
+		if (plen > maxplen):
+			maxplen = plen
+
+	header = '~'*10 + ' Hotkeys ' + '~'*10
+	print(header)
+	for lineindex in range(len(hotkeys)):
+		if ((lineindex+2)%3==0):
+			print()
+		prompt, info = hotkeys[lineindex]
+		numspaces = maxplen - len(prompt) + 3
+		print(' %s'%prompt + ' '*numspaces + '\t' + '%s'%info)
+
+	command_help(None)
+
+def hotkey_switchmode(stateinfo):
+	if (stateinfo.editmode):
+		print('Leaving edit mode, playing animation.')
+	else:
+		print('Returning to edit mode.')
+	stateinfo.editmode = not stateinfo.editmode
+
+def hotkey_command(stateinfo):
+	done_with_prompt = False
+	print('Command dialogue opened.')
+	print('Enter "quit" to exit. Enter "help" for a list of commands.')
+	while (not done_with_prompt):
+		userinput = input('>> ')
+		if (userinput == 'quit'):
+			done_with_prompt = True
+		else:
+			splinput = userinput.split(' ')
+			command = splinput[0]
+			if (command in COMMANDS_DICT):
+				kargs = {'stateinfo' : stateinfo}
+				if (len(splinput) > 1):
+					argslist = [item.split('=') for item in splinput[1:]]
+					for arg in argslist:
+						assert(arg != 'stateinfo')
+						kargs[arg[0]] = arg[1]
+				COMMANDS_DICT[command](kargs)
+			else:
+				print('Command not recognized. Enter "help" for a list of commands.')
 
 class InputHandler:
 	def __init__(self):
@@ -193,9 +233,8 @@ class InputHandler:
 		# only count fresh inputs for these actions
 		fresh_actions = [
 			InputDataIndex.HELP,
-			InputDataIndex.LOAD,
 			InputDataIndex.PLAY_EDIT_SWITCH,
-			InputDataIndex.STATEINFO
+			InputDataIndex.COMMAND
 		]
 
 		fresh_action_procs = {}
@@ -208,19 +247,17 @@ class InputHandler:
 
 		# map actions to functions here
 		if (fresh_action_procs[InputDataIndex.HELP]):
-			prompt_help()
-		elif (fresh_action_procs[InputDataIndex.STATEINFO]):
-			prompt_stateinfo(stateinfo)
+			hotkey_help()
 		elif (stateinfo.editmode == True): 
 			# edit mode
 			if (fresh_action_procs[InputDataIndex.PLAY_EDIT_SWITCH]):
-				prompt_switchmode(result)
-			elif (fresh_action_procs[InputDataIndex.LOAD]):
-				prompt_load(result)
+				hotkey_switchmode(result)
+			elif (fresh_action_procs[InputDataIndex.COMMAND]):
+				hotkey_command(result)
 		else: 
 			# play mode
 			if (fresh_action_procs[InputDataIndex.PLAY_EDIT_SWITCH]):
-				prompt_switchmode(result)
+				hotkey_switchmode(result)
 
 		return result
 
@@ -239,10 +276,9 @@ class InputMoveDir(IntEnum):
 # TODO: remember to update button mapping in InputDataBuffer
 class InputDataIndex(IntEnum):
 	HELP = 0
-	LOAD = 1
+	COMMAND = 1
 	PLAY_EDIT_SWITCH = 2
 	MOVEDIR = 3
-	STATEINFO = 4
 
 MAXINPUTQUEUELEN = 5
 
@@ -258,9 +294,8 @@ class InputDataBuffer:
 
 		self.button_mapping = {
 			pygame.K_h : InputDataIndex.HELP,
-			pygame.K_l : InputDataIndex.LOAD,
 			pygame.K_SPACE : InputDataIndex.PLAY_EDIT_SWITCH,
-			pygame.K_s : InputDataIndex.STATEINFO
+			pygame.K_BACKQUOTE : InputDataIndex.COMMAND
 		}
 
 	def newinput(self, curr_input):
@@ -436,8 +471,7 @@ class EditorState:
 def print_startmessage():
 	print()
 	print("Starting in editor mode.")
-	print("Press H for a list of commands.")
-	print("Press L to load an animation.")
+	hotkey_help()
 	print()
 
 def main():
@@ -542,6 +576,7 @@ def main():
 			blitlist.clear()
 		else:
 			# play animation
+			pass
 
 		# display fps
 		screen.blit(fps_text, (1, 1))

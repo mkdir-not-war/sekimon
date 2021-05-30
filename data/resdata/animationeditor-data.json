@@ -1,0 +1,38 @@
+{
+	"hotkeys" : [
+		{
+			"key" : "escape",
+			"info" : "quit the application"
+		},
+		{
+			"key" : "H",
+			"info" : "print this list again"
+		},
+		{
+			"key" : "tilde",
+			"info" : "open command dialogue"
+		},
+		{
+			"key" : "spacebar",
+			"info" : "swap between edit and play mode"
+		}
+	],
+	"commands" : [
+		{
+			"prompt" : "help",
+			"info" : "print this list again"
+		},
+		{
+			"prompt" : "quit",
+			"info" : "exit the command dialogue"
+		},
+		{
+			"prompt" : "state",
+			"info" : "print current editor state info"
+		},
+		{
+			"prompt" : "load id=<animation id>",
+			"info" : "load the animation with id <animation id>"
+		}
+	]
+}
